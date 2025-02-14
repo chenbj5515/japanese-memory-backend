@@ -1,0 +1,9 @@
+name = "japanese-memory-auth"             # 给你的 Worker 命名，名称需唯一
+main = "src/worker.ts"         # 指定入口文件，请确保该文件存在
+account_id = "6e1c1e8fdfaf0930736087fb76c2ccd5"  # 请替换为你实际的 Account ID
+workers_dev = true                   # 如果想先发布到 *.workers.dev 进行测试
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+BASE_URL = "japanese-memory-auth.chenbj55150220.workers.dev"

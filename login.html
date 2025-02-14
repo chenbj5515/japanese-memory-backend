@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <!-- ... 之前的 head 内容保持不变 ... -->
+</head>
+<body>
+    <div class="login-container">
+        <h2>欢迎登录</h2>
+        <button class="login-button github-button" onclick="handleGithubLogin()">
+            <img src="https://github.com/favicon.ico" alt="GitHub图标" class="button-icon">
+            <span class="button-text">使用GitHub登录</span>
+        </button>
+        <button class="login-button google-button" onclick="handleGoogleLogin()">
+            <img src="https://www.google.com/favicon.ico" alt="Google图标" class="button-icon">
+            <span class="button-text">使用Google登录</span>
+        </button>
+        <button class="login-button" onclick="getUserInfo()">获取用户信息</button>
+    </div>
+
+    <script>
+        async function handleGithubLogin() {
+            try {
+                const response = await fetch('http://localhost:3000/auth/github/login', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // 重定向到 GitHub 授权页面
+                    console.log(data, "data================");
+                    window.location.href = data.authUrl;
+                } else {
+                    console.error('GitHub登录请求失败');
+                }
+            } catch (error) {
+                console.error('发生错误:', error);
+            }
+        }
+
+        async function handleGoogleLogin() {
+            try {
+                const response = await fetch('http://localhost:3000/auth/google/login', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // 重定向到 Google 授权页面
+                    window.location.href = data.authUrl;
+                } else {
+                    console.error('Google登录请求失败');
+                }
+            } catch (error) {
+                console.error('发生错误:', error);
+            }
+        }
+
+        async function getUserInfo() {
+            try {
+                const response = await fetch('http://localhost:3000/api/user/info', {
+                    method: 'GET',
+                    credentials: 'include',  // 重要：允许发送cookies
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        alert('用户信息：' + JSON.stringify(data.user, null, 2));
+                    } else {
+                        alert('获取用户信息失败：' + data.error);
+                    }
+                } else {
+                    alert('请求失败');
+                }
+            } catch (error) {
+                console.error('发生错误:', error);
+                alert('发生错误：' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { AuthorizationCode } from 'simple-oauth2';
-import { serve } from '@hono/node-server';
+// import { serve } from '@hono/node-server';
 import 'dotenv/config';
 import { setCookie, getCookie } from 'hono/cookie'
 import jwt from 'jsonwebtoken';
@@ -19,81 +19,62 @@ app.use('*', cors({
 
 // 修改后的 createJWTToken: 接受包含 user_id 和 current_plan 的对象作为参数
 function createJWTToken(payload: { user_id: number | null; current_plan: any }): string {
-  return jwt.sign(
-    {
-      ...payload,
-      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7天后过期
-    },
-    JWT_SECRET
-  );
+    return jwt.sign(
+        {
+            ...payload,
+            exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7天后过期
+        },
+        JWT_SECRET
+    );
 }
 
 // 新函数 generateJWTForUser：只负责生成 JWT，不再创建或更新用户
 async function generateJWTForUser(platform_id: string): Promise<string> {
-  // 根据平台的 id 查找用户是否存在（假设平台 id 存在于 github_id 字段中）
-  const existing = await db.selectFrom('user')
-    .select(['user_id'])
-    .where('github_id', '=', platform_id)
-    .executeTakeFirst();
+    // 根据平台的 id 查找用户是否存在（假设平台 id 存在于 github_id 字段中）
+    const existing = await db.selectFrom('user')
+        .select(['user_id'])
+        .where('github_id', '=', platform_id)
+        .executeTakeFirst();
 
-  // 初始化 JWT payload，默认两个属性均为 null
-  let tokenPayload = { user_id: null, current_plan: null };
+    // 初始化 JWT payload，默认两个属性均为 null
+    let tokenPayload = { user_id: null, current_plan: null };
 
-  if (existing) {
-    tokenPayload.user_id = existing.user_id;
-    // 从 user_current_plan 表中查询对应的 current_plan 值
-    const planRow = await db.selectFrom('user_current_plan')
-      .select(['current_plan'])
-      .where('user_id', '=', existing.user_id)
-      .executeTakeFirst();
+    if (existing) {
+        tokenPayload.user_id = existing.user_id;
+        // 从 user_current_plan 表中查询对应的 current_plan 值
+        const planRow = await db.selectFrom('user_current_plan')
+            .select(['current_plan'])
+            .where('user_id', '=', existing.user_id)
+            .executeTakeFirst();
 
-    if (planRow) {
-      tokenPayload.current_plan = planRow.current_plan;
+        if (planRow) {
+            tokenPayload.current_plan = planRow.current_plan;
+        }
     }
-  }
 
-  // 返回生成的 JWT token
-  return createJWTToken(tokenPayload);
+    // 返回生成的 JWT token
+    return createJWTToken(tokenPayload);
 }
-
-// 配置 GitHub OAuth2 客户端
-const githubConfig = {
-    client: {
-        id: GITHUB_CLIENT_ID,
-        secret: GITHUB_CLIENT_SECRET,
-    },
-    auth: {
-        tokenHost: 'https://github.com',
-        tokenPath: '/login/oauth/access_token',
-        authorizePath: '/login/oauth/authorize',
-    },
-};
-
-const githubClient = new AuthorizationCode(githubConfig);
-
-// 配置 Google OAuth2 客户端
-const googleConfig = {
-    client: {
-        id: GOOGLE_CLIENT_ID,
-        secret: GOOGLE_CLIENT_SECRET,
-    },
-    auth: {
-        tokenHost: 'https://oauth2.googleapis.com',
-        tokenPath: '/token',
-        authorizeHost: 'https://accounts.google.com',
-        authorizePath: '/o/oauth2/v2/auth',
-    },
-};
-
-const googleClient = new AuthorizationCode(googleConfig);
-
-// JWT密钥（应该放在环境变量中）
-const JWT_SECRET = process.env.JWT_SECRET!;
 
 /** GitHub 登录流程 **/
 
 // 跳转到 GitHub 授权页面
 app.get('/auth/github/login', (c) => {
+    // 配置 GitHub OAuth2 客户端
+    const githubConfig = {
+        client: {
+            id: GITHUB_CLIENT_ID,
+            secret: GITHUB_CLIENT_SECRET,
+        },
+        auth: {
+            tokenHost: 'https://github.com',
+            tokenPath: '/login/oauth/access_token',
+            authorizePath: '/login/oauth/authorize',
+        },
+    };
+
+    const githubClient = new AuthorizationCode(githubConfig);
+
     const redirectUri = `${BASE_URL}/auth/github/callback`;
     const authorizationUri = githubClient.authorizeURL({
         redirect_uri: redirectUri,
@@ -109,6 +90,20 @@ app.get('/auth/github/login', (c) => {
 
 // GitHub 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/github/callback', async (c) => {
+    // 配置 GitHub OAuth2 客户端
+    const githubConfig = {
+        client: {
+            id: GITHUB_CLIENT_ID,
+            secret: GITHUB_CLIENT_SECRET,
+        },
+        auth: {
+            tokenHost: 'https://github.com',
+            tokenPath: '/login/oauth/access_token',
+            authorizePath: '/login/oauth/authorize',
+        },
+    };
+
+    const githubClient = new AuthorizationCode(githubConfig);
     const code = c.req.query('code');
     if (!code) {
         return c.json({ success: false, error: 'No code provided' }, 400);
@@ -154,6 +149,22 @@ app.get('/auth/github/callback', async (c) => {
 
 // 跳转到 Google 授权页面
 app.get('/auth/google/login', (c) => {
+    // 配置 Google OAuth2 客户端
+    const googleConfig = {
+        client: {
+            id: GOOGLE_CLIENT_ID,
+            secret: GOOGLE_CLIENT_SECRET,
+        },
+        auth: {
+            tokenHost: 'https://oauth2.googleapis.com',
+            tokenPath: '/token',
+            authorizeHost: 'https://accounts.google.com',
+            authorizePath: '/o/oauth2/v2/auth',
+        },
+    };
+
+    const googleClient = new AuthorizationCode(googleConfig);
+
     const redirectUri = `${BASE_URL}/auth/google/callback`;
     const authorizationUri = googleClient.authorizeURL({
         redirect_uri: redirectUri,
@@ -170,6 +181,22 @@ app.get('/auth/google/login', (c) => {
 
 // Google 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/google/callback', async (c) => {
+    // 配置 Google OAuth2 客户端
+    const googleConfig = {
+        client: {
+            id: GOOGLE_CLIENT_ID,
+            secret: GOOGLE_CLIENT_SECRET,
+        },
+        auth: {
+            tokenHost: 'https://oauth2.googleapis.com',
+            tokenPath: '/token',
+            authorizeHost: 'https://accounts.google.com',
+            authorizePath: '/o/oauth2/v2/auth',
+        },
+    };
+
+    const googleClient = new AuthorizationCode(googleConfig);
+
     const code = c.req.query('code');
     if (!code) {
         return c.json({ success: false, error: 'No code provided' }, 400);
@@ -237,11 +264,11 @@ app.get('/api/user/info', async (c) => {
 });
 
 // 替换原来的 listen 调用
-serve({
-    fetch: app.fetch,
-    port: 3000
-}, (info) => {
-    console.log(`SSO API 服务运行在 http://localhost:${info.port}`);
-});
+// serve({
+//     fetch: app.fetch,
+//     port: 3000
+// }, (info) => {
+//     console.log(`SSO API 服务运行在 http://localhost:${info.port}`);
+// });
 
 export default app;

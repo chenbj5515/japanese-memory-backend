@@ -8,4 +8,5 @@ declare global {
   var BASE_URL: string;
   var DATABASE_URL: string;
   var db: Kysely<any>;
+  var JWT_SECRET: string;
 } 

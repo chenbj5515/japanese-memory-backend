@@ -9,6 +9,7 @@ import { fetchGoogleToken } from './oauth2/google';
 import { Kysely } from 'kysely';
 import { Pool } from 'pg';
 import { PostgresDialect } from 'kysely';
+import { fetchGithubToken } from './oauth2/github';
 
 // 创建 Hono 应用
 const app = new Hono();
@@ -125,42 +126,16 @@ interface GithubUser {
 
 // GitHub 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/github/callback', async (c) => {
-    // 配置 GitHub OAuth2 客户端
-    const githubConfig = {
-        client: {
-            id: GITHUB_CLIENT_ID,
-            secret: GITHUB_CLIENT_SECRET,
-        },
-        auth: {
-            tokenHost: 'https://github.com',
-            tokenPath: '/login/oauth/access_token',
-            authorizePath: '/login/oauth/authorize',
-        },
-    };
-
-    const githubClient = new AuthorizationCode(githubConfig);
     const code = c.req.query('code');
     if (!code) {
         return c.json({ success: false, error: 'No code provided' }, 400);
     }
     const redirectUri = `${BASE_URL}/auth/github/callback`;
     try {
-        const tokenParams = {
-            code,
-            redirect_uri: redirectUri,
-            scope: 'read:user user:email',
-        };
-        const accessToken = await githubClient.getToken(tokenParams);
-        const token = accessToken.token.access_token as string;
+        // 使用 fetchGithubToken 替换原有的获取 token 和用户信息的流程
+        const { githubUser } = await fetchGithubToken(code, redirectUri);
 
-        // 获取 GitHub 用户信息
-        const userRes = await fetch('https://api.github.com/user', {
-            headers: {
-                'Authorization': `token ${token}`,
-                'User-Agent': 'Hono-SSO-Service',
-            },
-        });
-        const githubUser = await userRes.json() as GithubUser;
+        // 创建数据库实例
         const db = new Kysely<Database>({
             dialect: new PostgresDialect({
                 pool: new Pool({
@@ -169,16 +144,16 @@ app.get('/auth/github/callback', async (c) => {
             }),
         });
 
+        // 根据 GitHub 用户ID生成 JWT
         const jwtToken = await generateJWTForUser(githubUser.id, db, JWT_SECRET);
 
-        // 设置cookie
+        // 设置 cookie
         setCookie(c, 'session', jwtToken, {
             httpOnly: true,
             secure: true,
             sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 // 7天
         });
-
         return c.text('success');
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 400);

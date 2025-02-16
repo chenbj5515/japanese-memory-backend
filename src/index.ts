@@ -1,39 +1,18 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { AuthorizationCode } from 'simple-oauth2';
-import { serve } from '@hono/node-server';
+// import { serve } from '@hono/node-server';
 import 'dotenv/config';
 import { setCookie, getCookie } from 'hono/cookie'
 import jwt from 'jsonwebtoken';
-import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
+// import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 import { fetchGoogleToken } from './oauth2/google';
 import { Kysely } from 'kysely';
-// import { serveStatic } from 'hono/deno'
-// import { serveStatic } from 'hono/serve-static';
-// import { join } from 'path';
-// import { promises as fs } from 'fs';
-// 新增用于数据库初始化的导入
 import { Pool } from 'pg';
 import { PostgresDialect } from 'kysely';
 
 // 创建 Hono 应用
 const app = new Hono();
-
-// app.get('/', (c) => c.redirect('/static/index.html'));
-app.get('/', (c) => c.text('You can access: /static/hello.txt'))
-
-// app.use('/static', serveStatic({
-//   root: join(process.cwd(), 'public'),
-//   async getContent(path: string, c) {
-//     try {
-//       const filePath = join(process.cwd(), 'public', path);
-//       console.log("尝试读取文件:", filePath);
-//       return await fs.readFile(filePath);
-//     } catch (error) {
-//       return null;
-//     }
-//   },
-// }));
 
 // chrome-extension://<blaklmjncfkjnjddaaihnojkklnempdj>
 // http://localhost:8080
@@ -167,7 +146,6 @@ app.get('/auth/github/callback', async (c) => {
         const accessToken = await githubClient.getToken(tokenParams);
         const token = accessToken.token.access_token as string;
 
-        console.log(accessToken, token, "token================");
         // 获取 GitHub 用户信息
         const userRes = await fetch('https://api.github.com/user', {
             headers: {
@@ -176,7 +154,6 @@ app.get('/auth/github/callback', async (c) => {
             },
         });
         const githubUser = await userRes.json() as GithubUser;
-        console.log(githubUser, "githubUser================");
         const db = new Kysely<Database>({
             dialect: new PostgresDialect({
                 pool: new Pool({
@@ -322,20 +299,20 @@ app.get('/api/user/info', async (c) => {
 /**
  * 处理请求：优先尝试获取静态资源，如果没有则交给 Hono 路由处理
  */
-async function handleRequest(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
-    try {
-        console.log(request, "尝试从 KV 静态文件中获取资源");
-        // 尝试从 KV 静态文件中获取资源
-        // 可选：你可以根据请求路径来决定是否直接调用 getAssetFromKV，比如只对 /static/* 做处理
-        return await getAssetFromKV({ request, env, ctx });
-    } catch (error) {
-        console.log(error, "尝试从 KV 静态文件中获取资源error");
-        // 没有找到匹配的静态资源，交由 Hono 应用继续处理
-        return app.fetch(request, env, ctx);
-    }
-}
+// async function handleRequest(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+//     try {
+//         // 尝试从 KV 静态文件中获取资源
+//         // 可选：你可以根据请求路径来决定是否直接调用 getAssetFromKV，比如只对 /static/* 做处理
+//         return await getAssetFromKV({ request, env, ctx });
+//     } catch (error) {
+//         // 没有找到匹配的静态资源，交由 Hono 应用继续处理
+//         return app.fetch(request, env, ctx);
+//     }
+// }
 
-// 导出 fetch 事件处理函数
-export default {
-    fetch: handleRequest,
-};
+// // 导出 fetch 事件处理函数
+// export default {
+//     fetch: handleRequest,
+// };
+
+export default app;

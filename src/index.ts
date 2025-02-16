@@ -5,7 +5,6 @@ import { AuthorizationCode } from 'simple-oauth2';
 import 'dotenv/config';
 import { setCookie, getCookie } from 'hono/cookie'
 import jwt from 'jsonwebtoken';
-// import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
 import { fetchGoogleToken } from './oauth2/google';
 import { Kysely } from 'kysely';
 import { Pool } from 'pg';
@@ -290,6 +289,18 @@ app.get('/api/user/info', async (c) => {
     }
 });
 
+// 新增登出接口
+app.get('/auth/logout', (c) => {
+  // 通过设置 maxAge 为 0 来清除 'session' cookie
+  setCookie(c, 'session', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+    maxAge: 0
+  });
+  return c.json({ success: true, message: '已成功登出' });
+});
+
 // 替换原来的 listen 调用
 // serve({
 //     fetch: app.fetch,
@@ -297,24 +308,5 @@ app.get('/api/user/info', async (c) => {
 // }, (info) => {
 //     console.log(`SSO API 服务运行在 http://localhost:${info.port}`);
 // });
-
-/**
- * 处理请求：优先尝试获取静态资源，如果没有则交给 Hono 路由处理
- */
-// async function handleRequest(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
-//     try {
-//         // 尝试从 KV 静态文件中获取资源
-//         // 可选：你可以根据请求路径来决定是否直接调用 getAssetFromKV，比如只对 /static/* 做处理
-//         return await getAssetFromKV({ request, env, ctx });
-//     } catch (error) {
-//         // 没有找到匹配的静态资源，交由 Hono 应用继续处理
-//         return app.fetch(request, env, ctx);
-//     }
-// }
-
-// // 导出 fetch 事件处理函数
-// export default {
-//     fetch: handleRequest,
-// };
 
 export default app;

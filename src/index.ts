@@ -23,7 +23,7 @@ app.use('*', cors({
 }));
 
 // 修改后的 createJWTToken: 接受包含 user_id 和 current_plan 的对象作为参数
-function createJWTToken(payload: { user_id: number | null; current_plan: any}, JWT_SECRET: string ): string {
+function createJWTToken(payload: { user_id: number | null; current_plan: any }, JWT_SECRET: string): string {
     return jwt.sign(
         {
             ...payload,
@@ -38,7 +38,9 @@ interface Database {
     user: {
         user_id: number;
         github_id: string;
-        // 其他字段...
+        profile: string;
+        name: string;
+        email: string;
     };
     user_current_plan: {
         user_id: number;
@@ -51,18 +53,24 @@ async function generateJWTForUser(platform_id: string, db: Kysely<Database>, JWT
     // 根据平台的 id 查找用户是否存在（假设平台 id 存在于 github_id 字段中）
     const existing = await db
         .selectFrom('user')
-        .select(['user_id'])
+        .select(['user_id', 'profile', 'name', 'email'])
         .where('github_id', '=', platform_id)
         .executeTakeFirst();
 
     // 明确指定 tokenPayload 类型
-    let tokenPayload: { user_id: number | null; current_plan: any } = {
+    let tokenPayload: { user_id: number | null; current_plan: any; profile: string; name: string; email: string } = {
         user_id: null,
         current_plan: null,
+        profile: '',
+        name: '',
+        email: '',
     };
 
     if (existing) {
         tokenPayload.user_id = existing.user_id;
+        tokenPayload.profile = existing.profile;
+        tokenPayload.name = existing.name;
+        tokenPayload.email = existing.email;
         // 从 user_current_plan 表中查询对应的 current_plan 值
         const planRow = await db
             .selectFrom('user_current_plan')
@@ -258,12 +266,6 @@ app.get('/auth/google/callback', async (c) => {
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 400);
     }
-});
-
-// 示例：一个用于检查当前 session 状态的接口（这里仅作示例）
-app.get('/api/auth/session', (c) => {
-    // 实际应用中，你可能会校验 JWT 或其他会话信息
-    return c.json({ session: null });
 });
 
 // 验证时会解析回完整的对象

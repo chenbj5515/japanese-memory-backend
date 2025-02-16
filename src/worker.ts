@@ -17,6 +17,7 @@ export default {
       GOOGLE_CLIENT_SECRET: string;
       BASE_URL: string;
       DATABASE_URL: string;
+      JWT_SECRET: string;
       // 如果还有其他环境变量，也可以在此处声明  
     },
     ctx: ExecutionContext
@@ -28,19 +29,11 @@ export default {
     globalThis.GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET;
     globalThis.BASE_URL = env.BASE_URL;
     globalThis.DATABASE_URL = env.DATABASE_URL;
-
-    // 初始化数据库（以 Postgres 为例）
-    const db = new Kysely<any>({
-      dialect: new PostgresDialect({
-        pool: new Pool({ connectionString: DATABASE_URL }),
-      }),
-    });
-
-    globalThis.db = db;
+    globalThis.JWT_SECRET = env.JWT_SECRET;
 
     // 如果以后有更多变量，例如:
     // globalThis.OTHER_VAR = env.OTHER_VAR;
 
-    return await app.fetch(request);
+    return await app.fetch(request, env, { ...ctx, props: {} });
   },
 }; 

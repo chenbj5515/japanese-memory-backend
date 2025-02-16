@@ -7,6 +7,5 @@ declare global {
   var GOOGLE_CLIENT_SECRET: string;
   var BASE_URL: string;
   var DATABASE_URL: string;
-  var db: Kysely<any>;
   var JWT_SECRET: string;
 } 

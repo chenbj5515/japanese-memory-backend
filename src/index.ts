@@ -1,24 +1,50 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { AuthorizationCode } from 'simple-oauth2';
-// import { serve } from '@hono/node-server';
+import { serve } from '@hono/node-server';
 import 'dotenv/config';
 import { setCookie, getCookie } from 'hono/cookie'
 import jwt from 'jsonwebtoken';
+import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
+import { fetchGoogleToken } from './oauth2/google';
+import { Kysely } from 'kysely';
+// import { serveStatic } from 'hono/deno'
+// import { serveStatic } from 'hono/serve-static';
+// import { join } from 'path';
+// import { promises as fs } from 'fs';
+// 新增用于数据库初始化的导入
+import { Pool } from 'pg';
+import { PostgresDialect } from 'kysely';
 
 // 创建 Hono 应用
 const app = new Hono();
+
+// app.get('/', (c) => c.redirect('/static/index.html'));
+app.get('/', (c) => c.text('You can access: /static/hello.txt'))
+
+// app.use('/static', serveStatic({
+//   root: join(process.cwd(), 'public'),
+//   async getContent(path: string, c) {
+//     try {
+//       const filePath = join(process.cwd(), 'public', path);
+//       console.log("尝试读取文件:", filePath);
+//       return await fs.readFile(filePath);
+//     } catch (error) {
+//       return null;
+//     }
+//   },
+// }));
 
 // chrome-extension://<blaklmjncfkjnjddaaihnojkklnempdj>
 // http://localhost:8080
 // 配置 CORS，允许来自指定源的跨域请求
 app.use('*', cors({
-    origin: 'chrome-extension://<blaklmjncfkjnjddaaihnojkklnempdj>',
+    origin: 'chrome-extension://kfiiheaabjfobkicmpidpgpcamkffeon',
     credentials: true,
 }));
 
 // 修改后的 createJWTToken: 接受包含 user_id 和 current_plan 的对象作为参数
-function createJWTToken(payload: { user_id: number | null; current_plan: any }): string {
+function createJWTToken(payload: { user_id: number | null; current_plan: any}, JWT_SECRET: string ): string {
     return jwt.sign(
         {
             ...payload,
@@ -28,21 +54,39 @@ function createJWTToken(payload: { user_id: number | null; current_plan: any }):
     );
 }
 
+interface Database {
+    // 在此定义你的数据库结构，例如：
+    user: {
+        user_id: number;
+        github_id: string;
+        // 其他字段...
+    };
+    user_current_plan: {
+        user_id: number;
+        current_plan: any;
+    };
+}
+
 // 新函数 generateJWTForUser：只负责生成 JWT，不再创建或更新用户
-async function generateJWTForUser(platform_id: string): Promise<string> {
+async function generateJWTForUser(platform_id: string, db: Kysely<Database>, JWT_SECRET: string): Promise<string> {
     // 根据平台的 id 查找用户是否存在（假设平台 id 存在于 github_id 字段中）
-    const existing = await db.selectFrom('user')
+    const existing = await db
+        .selectFrom('user')
         .select(['user_id'])
         .where('github_id', '=', platform_id)
         .executeTakeFirst();
 
-    // 初始化 JWT payload，默认两个属性均为 null
-    let tokenPayload = { user_id: null, current_plan: null };
+    // 明确指定 tokenPayload 类型
+    let tokenPayload: { user_id: number | null; current_plan: any } = {
+        user_id: null,
+        current_plan: null,
+    };
 
     if (existing) {
         tokenPayload.user_id = existing.user_id;
         // 从 user_current_plan 表中查询对应的 current_plan 值
-        const planRow = await db.selectFrom('user_current_plan')
+        const planRow = await db
+            .selectFrom('user_current_plan')
             .select(['current_plan'])
             .where('user_id', '=', existing.user_id)
             .executeTakeFirst();
@@ -53,7 +97,7 @@ async function generateJWTForUser(platform_id: string): Promise<string> {
     }
 
     // 返回生成的 JWT token
-    return createJWTToken(tokenPayload);
+    return createJWTToken(tokenPayload, JWT_SECRET);
 }
 
 /** GitHub 登录流程 **/
@@ -87,6 +131,11 @@ app.get('/auth/github/login', (c) => {
         authUrl: authorizationUri
     });
 });
+
+interface GithubUser {
+    id: string; // 根据返回数据类型，这里可以是 string 或 number
+    // 添加其他必要的字段
+}
 
 // GitHub 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/github/callback', async (c) => {
@@ -126,10 +175,17 @@ app.get('/auth/github/callback', async (c) => {
                 'User-Agent': 'Hono-SSO-Service',
             },
         });
-        const githubUser = await userRes.json();
+        const githubUser = await userRes.json() as GithubUser;
         console.log(githubUser, "githubUser================");
+        const db = new Kysely<Database>({
+            dialect: new PostgresDialect({
+                pool: new Pool({
+                    connectionString: DATABASE_URL,
+                }),
+            }),
+        });
 
-        const jwtToken = await generateJWTForUser(githubUser.id);
+        const jwtToken = await generateJWTForUser(githubUser.id, db, JWT_SECRET);
 
         // 设置cookie
         setCookie(c, 'session', jwtToken, {
@@ -179,56 +235,48 @@ app.get('/auth/google/login', (c) => {
     });
 });
 
+interface GoogleUser {
+    sub: string;
+    // 根据需要添加其他属性
+}
+
 // Google 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/google/callback', async (c) => {
-    // 配置 Google OAuth2 客户端
-    const googleConfig = {
-        client: {
-            id: GOOGLE_CLIENT_ID,
-            secret: GOOGLE_CLIENT_SECRET,
-        },
-        auth: {
-            tokenHost: 'https://oauth2.googleapis.com',
-            tokenPath: '/token',
-            authorizeHost: 'https://accounts.google.com',
-            authorizePath: '/o/oauth2/v2/auth',
-        },
-    };
-
-    const googleClient = new AuthorizationCode(googleConfig);
-
     const code = c.req.query('code');
     if (!code) {
         return c.json({ success: false, error: 'No code provided' }, 400);
     }
     const redirectUri = `${BASE_URL}/auth/google/callback`;
-    try {
-        const tokenParams = {
-            code,
-            redirect_uri: redirectUri,
-            scope: 'openid email profile',
-        };
-        const accessToken = await googleClient.getToken(tokenParams);
-        const token = accessToken.token.access_token as string;
 
-        // 获取 Google 用户信息（使用 OpenID Connect 端点）
+    try {
+        // 直接使用自定义 fetchGoogleToken 方法获取 token
+        const tokenResponse = await fetchGoogleToken(code, redirectUri);
+        const token = tokenResponse.access_token as string;
+
+        // 使用 token 获取 Google 用户信息
         const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
         });
-        const googleUser = await userRes.json();
+        const googleUser = (await userRes.json()) as GoogleUser;
+        const db = new Kysely<Database>({
+            dialect: new PostgresDialect({
+                pool: new Pool({
+                    connectionString: DATABASE_URL,
+                }),
+            }),
+        });
 
-        const jwtToken = await generateJWTForUser(googleUser.sub);
+        const jwtToken = await generateJWTForUser(googleUser.sub, db, JWT_SECRET);
 
-        // 设置cookie
+        // 设置 Cookie
         setCookie(c, 'session', jwtToken, {
             httpOnly: true,
             secure: true,
             sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 // 7天
         });
-
         return c.text('success');
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 400);
@@ -271,4 +319,23 @@ app.get('/api/user/info', async (c) => {
 //     console.log(`SSO API 服务运行在 http://localhost:${info.port}`);
 // });
 
-export default app;
+/**
+ * 处理请求：优先尝试获取静态资源，如果没有则交给 Hono 路由处理
+ */
+async function handleRequest(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+    try {
+        console.log(request, "尝试从 KV 静态文件中获取资源");
+        // 尝试从 KV 静态文件中获取资源
+        // 可选：你可以根据请求路径来决定是否直接调用 getAssetFromKV，比如只对 /static/* 做处理
+        return await getAssetFromKV({ request, env, ctx });
+    } catch (error) {
+        console.log(error, "尝试从 KV 静态文件中获取资源error");
+        // 没有找到匹配的静态资源，交由 Hono 应用继续处理
+        return app.fetch(request, env, ctx);
+    }
+}
+
+// 导出 fetch 事件处理函数
+export default {
+    fetch: handleRequest,
+};

@@ -4,6 +4,10 @@ account_id = "6e1c1e8fdfaf0930736087fb76c2ccd5"  # 请替换为你实际的 Acco
 workers_dev = true                   # 如果想先发布到 *.workers.dev 进行测试
 compatibility_date = "2025-02-14"
 compatibility_flags = ["nodejs_compat"]
+assets = { directory = "public" }
 
 [vars]
-BASE_URL = "japanese-memory-auth.chenbj55150220.workers.dev"
+BASE_URL = "https://japanese-memory-auth.chenbj55150220.workers.dev"
+
+[observability.logs]
+enabled = true

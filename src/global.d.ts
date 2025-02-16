@@ -8,4 +8,5 @@ declare global {
   var BASE_URL: string;
   var DATABASE_URL: string;
   var JWT_SECRET: string;
+  var OPENAI_API_KEY: string;
 } 

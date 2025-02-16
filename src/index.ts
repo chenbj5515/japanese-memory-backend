@@ -119,11 +119,6 @@ app.get('/auth/github/login', (c) => {
     });
 });
 
-interface GithubUser {
-    id: string; // 根据返回数据类型，这里可以是 string 或 number
-    // 添加其他必要的字段
-}
-
 // GitHub 回调，处理 code 换取 token，然后获取用户信息
 app.get('/auth/github/callback', async (c) => {
     const code = c.req.query('code');
@@ -274,6 +269,74 @@ app.get('/auth/logout', (c) => {
     maxAge: 0
   });
   return c.json({ success: true, message: '已成功登出' });
+});
+
+// 新增 OpenAI 处理接口
+app.post('/api/openai/extract-subtitles', async (c) => {
+  // 验证用户身份
+  const token = getCookie(c, 'session');
+  if (!token) {
+    return c.json({ success: false, error: '未登录' }, 401);
+  }
+  
+  let decoded: any;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return c.json({ success: false, error: '无效的会话' }, 401);
+  }
+  
+  // 检查解码后的 token 中 current_plan 字段是否存在
+  if (!decoded.current_plan) {
+    return c.json({ success: false, error: '无权限访问此接口' }, 403);
+  }
+  
+  // 读取请求体中的图片数据，这里假设客户端以二进制格式上传图片
+  const rawBody = await c.req.arrayBuffer();
+  const buffer = Buffer.from(rawBody);
+  const base64Image = buffer.toString('base64');
+  
+  // 获取 OpenAI API Key（建议通过环境变量进行配置）
+  const openaiApiKey = OPENAI_API_KEY;
+  if (!openaiApiKey) {
+    return c.json({ success: false, error: '服务器未配置 OpenAI API Key' }, 400);
+  }
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "请只识别并输出图片底部的日文字幕文本，不要输出其他内容。如果没有字幕，请返回空字符串。"
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/png;base64,${base64Image}`
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 100
+      })
+    });
+    
+    const data = await response.json();
+    return c.json({ success: true, subtitles: data.choices[0]?.message?.content || '' });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
 });
 
 // 替换原来的 listen 调用

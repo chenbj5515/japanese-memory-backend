@@ -1,6 +1,4 @@
-import { ExecutionContext } from 'hono';
-import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
+// import { ExecutionContext } from 'hono';
 import app from './index';
 
 /**
@@ -18,9 +16,9 @@ export default {
       BASE_URL: string;
       DATABASE_URL: string;
       JWT_SECRET: string;
+      OPENAI_API_KEY: string;
       // 如果还有其他环境变量，也可以在此处声明  
     },
-    ctx: ExecutionContext
   ): Promise<Response> {
     // 将所有需要的环境变量挂载到全局作用域上
     globalThis.GITHUB_CLIENT_ID = env.GITHUB_CLIENT_ID;
@@ -30,10 +28,11 @@ export default {
     globalThis.BASE_URL = env.BASE_URL;
     globalThis.DATABASE_URL = env.DATABASE_URL;
     globalThis.JWT_SECRET = env.JWT_SECRET;
+    globalThis.OPENAI_API_KEY = env.OPENAI_API_KEY;
 
     // 如果以后有更多变量，例如:
     // globalThis.OTHER_VAR = env.OTHER_VAR;
 
-    return await app.fetch(request, env, { ...ctx, props: {} });
+    return await app.fetch(request, env);
   },
 }; 

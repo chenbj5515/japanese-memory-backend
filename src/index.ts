@@ -11,6 +11,15 @@ import { Pool } from 'pg';
 import { PostgresDialect } from 'kysely';
 import { fetchGithubToken } from './oauth2/github';
 
+// const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+// const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+// const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+// const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+// const BASE_URL = process.env.BASE_URL;
+// const DATABASE_URL = process.env.DATABASE_URL;
+// const JWT_SECRET = process.env.JWT_SECRET;
+// const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
 // 创建 Hono 应用
 const app = new Hono();
 
@@ -261,85 +270,93 @@ app.get('/api/user/info', async (c) => {
 
 // 新增登出接口
 app.get('/auth/logout', (c) => {
-  // 通过设置 maxAge 为 0 来清除 'session' cookie
-  setCookie(c, 'session', '', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None',
-    maxAge: 0
-  });
-  return c.json({ success: true, message: '已成功登出' });
+    // 通过设置 maxAge 为 0 来清除 'session' cookie
+    setCookie(c, 'session', '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        maxAge: 0
+    });
+    return c.json({ success: true, message: '已成功登出' });
 });
 
 // 新增 OpenAI 处理接口
 app.post('/api/openai/extract-subtitles', async (c) => {
-  // 验证用户身份
-  const token = getCookie(c, 'session');
-  if (!token) {
-    return c.json({ success: false, error: '未登录' }, 401);
-  }
-  
-  let decoded: any;
-  try {
-    decoded = jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    return c.json({ success: false, error: '无效的会话' }, 401);
-  }
-  
-  // 检查解码后的 token 中 current_plan 字段是否存在
-  if (!decoded.current_plan) {
-    return c.json({ success: false, error: '无权限访问此接口' }, 403);
-  }
-  
-  // 读取请求体中的图片数据，这里假设客户端以二进制格式上传图片
-  const rawBody = await c.req.arrayBuffer();
-  const buffer = Buffer.from(rawBody);
-  const base64Image = buffer.toString('base64');
-  
-  // 获取 OpenAI API Key（建议通过环境变量进行配置）
-  const openaiApiKey = OPENAI_API_KEY;
-  if (!openaiApiKey) {
-    return c.json({ success: false, error: '服务器未配置 OpenAI API Key' }, 400);
-  }
-  
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "请只识别并输出图片底部的日文字幕文本，不要输出其他内容。如果没有字幕，请返回空字符串。"
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/png;base64,${base64Image}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 100
-      })
-    });
-    
-    const data = await response.json();
-    return c.json({ success: true, subtitles: data.choices[0]?.message?.content || '' });
-  } catch (err: any) {
-    return c.json({ success: false, error: err.message }, 500);
-  }
+    // 验证用户身份
+    const token = getCookie(c, 'session');
+    if (!token) {
+        return c.json({ success: false, error: '未登录' }, 401);
+    }
+
+    let decoded: any;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+        return c.json({ success: false, error: '无效的会话' }, 401);
+    }
+
+    if (!decoded.current_plan) {
+        return c.json({ success: false, error: '无权限访问此接口' }, 403);
+    }
+
+    // 修改为处理 FormData 格式的请求
+    const formData = await c.req.formData();
+    const imageFile = formData.get('image') as File;
+
+    if (!imageFile) {
+        return c.json({ success: false, error: '未找到图片文件' }, 400);
+    }
+
+    // 将文件转换为 base64
+    const arrayBuffer = await imageFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Image = buffer.toString('base64');
+
+    const openaiApiKey = OPENAI_API_KEY;
+    if (!openaiApiKey) {
+        return c.json({ success: false, error: '服务器未配置 OpenAI API Key' }, 400);
+    }
+
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiApiKey}`
+            },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",  // 更正模型名称
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: "请只识别并输出图片底部的日文字幕文本，不要输出其他内容。如果没有字幕，请返回空字符串。"
+                            },
+                            {
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:image/jpeg;base64,${base64Image}`
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens: 100
+            })
+        });
+
+        const data = await response.json();
+        console.log(data);
+        // 从响应中提取实际的字幕文本
+        const subtitles = data.choices?.[0]?.message?.content || '';
+        return c.json({ success: true, subtitles });
+    } catch (err: any) {
+        return c.json({ success: false, error: err?.message }, 500);
+    }
 });
 
-// 替换原来的 listen 调用
 // serve({
 //     fetch: app.fetch,
 //     port: 3000

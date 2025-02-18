@@ -19,7 +19,9 @@ import { fetchGithubToken } from './oauth2/github';
 // const DATABASE_URL = process.env.DATABASE_URL;
 // const JWT_SECRET = process.env.JWT_SECRET;
 // const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
+function getRandomNumber() {
+    return Math.floor(Math.random() * 5) + 1;
+}
 // 创建 Hono 应用
 const app = new Hono();
 
@@ -43,13 +45,15 @@ function createJWTToken(payload: { user_id: number | null; current_plan: any }, 
 }
 
 interface Database {
-    // 在此定义你的数据库结构，例如：
     user: {
-        user_id: number;
+        user_id: number;  // 添加问号使其成为可选
+        image?: string;
         github_id: string;
         profile: string;
         name: string;
         email: string;
+        create_time: Date;
+        update_time: Date;
     };
     user_current_plan: {
         user_id: number;
@@ -58,12 +62,13 @@ interface Database {
 }
 
 // 新函数 generateJWTForUser：只负责生成 JWT，不再创建或更新用户
-async function generateJWTForUser(platform_id: string, db: Kysely<Database>, JWT_SECRET: string): Promise<string> {
+async function generateJWTForUser(platformUser: any, db: Kysely<Database>, JWT_SECRET: string): Promise<string> {
+    const platformId = platformUser.id || platformUser.sub;
     // 根据平台的 id 查找用户是否存在（假设平台 id 存在于 github_id 字段中）
     const existing = await db
         .selectFrom('user')
         .select(['user_id', 'profile', 'name', 'email'])
-        .where('github_id', '=', platform_id)
+        .where('github_id', '=', platformId)
         .executeTakeFirst();
 
     // 明确指定 tokenPayload 类型
@@ -91,15 +96,79 @@ async function generateJWTForUser(platform_id: string, db: Kysely<Database>, JWT
             tokenPayload.current_plan = planRow.current_plan;
         }
     }
+    else {
+        // 如果用户不存在，创建新用户
+        const newUser = await db
+            .insertInto('user')
+            // @ts-ignore
+            .values({
+                github_id: platformId,
+                email: platformUser.email,  // 这里需要从 GitHub API 获取邮箱
+                name: platformUser.name,   // 这里需要从 GitHub API 获取用户名
+                image: platformUser.image,  // 这里需要从 GitHub API 获取头像
+                profile: `/assets/profiles/0${getRandomNumber()}.png`,
+                create_time: new Date(),
+                update_time: new Date()
+            })
+            .returning(['user_id', 'profile', 'name', 'email'])
+            .executeTakeFirst();
+
+        if (newUser) {
+            tokenPayload.user_id = newUser.user_id;
+            tokenPayload.profile = newUser.profile;
+            tokenPayload.name = newUser.name;
+            tokenPayload.email = newUser.email;
+        }
+    }
 
     // 返回生成的 JWT token
     return createJWTToken(tokenPayload, JWT_SECRET);
 }
 
+// 使用 Web Crypto API 生成随机 token
+function generateToken(): string {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+// 添加获取 CSRF token 的接口
+app.get('/auth/csrf-token', (c) => {
+    const token = generateToken();
+    
+    // 将 token 设置到 cookie 中，有效期 1 分钟
+    setCookie(c, 'csrf_token', token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        maxAge: 60  // 1分钟
+    });
+    
+    // 同时返回 token
+    return c.json({ csrf_token: token });
+});
+
 /** GitHub 登录流程 **/
 
 // 跳转到 GitHub 授权页面
 app.get('/auth/github/login', (c) => {
+    const cookieToken = getCookie(c, 'csrf_token');
+    const headerToken = c.req.header('X-CSRF-Token');  // 从请求头获取 token
+    
+    // 验证 CSRF token
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+        return c.json({ success: false, error: 'CSRF 令牌无效或已过期' }, 403);
+    }
+    
+    setCookie(c, 'csrf_token', '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        maxAge: 0
+    });
+    
     // 配置 GitHub OAuth2 客户端
     const githubConfig = {
         client: {
@@ -149,7 +218,7 @@ app.get('/auth/github/callback', async (c) => {
         });
 
         // 根据 GitHub 用户ID生成 JWT
-        const jwtToken = await generateJWTForUser(githubUser.id, db, JWT_SECRET);
+        const jwtToken = await generateJWTForUser(githubUser, db, JWT_SECRET);
 
         // 设置 cookie
         setCookie(c, 'session', jwtToken, {
@@ -168,6 +237,20 @@ app.get('/auth/github/callback', async (c) => {
 
 // 跳转到 Google 授权页面
 app.get('/auth/google/login', (c) => {
+    const cookieToken = getCookie(c, 'csrf_token');
+    const headerToken = c.req.header('X-CSRF-Token');  // 从请求头获取 token
+    
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+        return c.json({ success: false, error: 'CSRF 令牌无效或已过期' }, 403);
+    }
+    
+    setCookie(c, 'csrf_token', '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        maxAge: 0
+    });
+    
     // 配置 Google OAuth2 客户端
     const googleConfig = {
         client: {
@@ -231,7 +314,7 @@ app.get('/auth/google/callback', async (c) => {
             }),
         });
 
-        const jwtToken = await generateJWTForUser(googleUser.sub, db, JWT_SECRET);
+        const jwtToken = await generateJWTForUser(googleUser, db, JWT_SECRET);
 
         // 设置 Cookie
         setCookie(c, 'session', jwtToken, {

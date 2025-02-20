@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { AuthorizationCode } from 'simple-oauth2';
 // import { serve } from '@hono/node-server';
-import 'dotenv/config';
 import { setCookie, getCookie } from 'hono/cookie'
 import jwt from 'jsonwebtoken';
 import { fetchGoogleToken } from './oauth2/google';

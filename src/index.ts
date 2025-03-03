@@ -439,6 +439,173 @@ app.post('/api/openai/extract-subtitles', async (c) => {
     }
 });
 
+app.post('api/openai/stream', async (c) => {
+  try {
+    // 验证用户身份
+    const token = getCookie(c, 'session');
+    if (!token) {
+        return c.json({ success: false, error: '未登录' }, 401);
+    }
+
+    let decoded: any;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+        return c.json({ success: false, error: '无效的会话' }, 401);
+    }
+
+    if (!decoded.current_plan) {
+        return c.json({ success: false, error: '无权限访问此接口' }, 403);
+    }
+
+    if (!OPENAI_API_KEY) {
+        return c.json({ success: false, error: '服务器未配置 OpenAI API Key' }, 400);
+    }
+
+    const { prompt, model = 'gpt-4o' } = await c.req.json();
+    
+    if (!prompt) {
+      return c.json({ success: false, error: '缺少必要参数 prompt' }, 400);
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return c.json({ success: false, error: error.error?.message || '请求 OpenAI API 失败' }, response.status as any);
+    }
+
+    // 创建一个新的 ReadableStream
+    const stream = new ReadableStream({
+      async start(controller) {
+        // 处理来自 OpenAI 的流
+        const reader = response.body?.getReader();
+        if (!reader) {
+          controller.close();
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.close();
+              break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  continue;
+                }
+                
+                try {
+                  const json = JSON.parse(data);
+                  const content = json.choices[0]?.delta?.content || '';
+                  if (content) {
+                    controller.enqueue(content);
+                  }
+                } catch (e) {
+                  console.error('解析 JSON 失败:', e);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message }, 500);
+  }
+});
+
+// 普通的 OpenAI 调用，直接返回完成的数据
+app.post('/api/openai/completion', async (c) => {
+  try {
+    // 验证用户身份
+    const token = getCookie(c, 'session');
+    if (!token) {
+        return c.json({ success: false, error: '未登录' }, 401);
+    }
+
+    let decoded: any;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+        return c.json({ success: false, error: '无效的会话' }, 401);
+    }
+
+    if (!decoded.current_plan) {
+        return c.json({ success: false, error: '无权限访问此接口' }, 403);
+    }
+
+    if (!OPENAI_API_KEY) {
+      return c.json({ success: false, error: '未配置 OpenAI API 密钥' }, 500);
+    }
+
+    const body = await c.req.json();
+    const { prompt, model = 'gpt-4o' } = body;
+
+    if (!prompt) {
+      return c.json({ success: false, error: '缺少必要的 prompt 参数' }, 400);
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return c.json({ success: false, error: `OpenAI API 错误: ${error.error?.message || '未知错误'}` }, response.status as any);
+    }
+
+    const data = await response.json();
+    return c.json({
+      success: true,
+      data: data.choices[0]?.message?.content || ''
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || '处理请求时发生错误' }, 500);
+  }
+});
+
+
 // serve({
 //     fetch: app.fetch,
 //     port: 3000

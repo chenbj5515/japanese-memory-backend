@@ -30,7 +30,6 @@
                 if (response.ok) {
                     const data = await response.json();
                     // 重定向到 GitHub 授权页面
-                    console.log(data, "data================");
                     window.location.href = data.authUrl;
                 } else {
                     console.error('GitHub登录请求失败');

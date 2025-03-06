@@ -14,5 +14,11 @@
   ],
   "env": {
     "NODEJS_HELPERS": "0"
+  },
+  "functions": {
+    "api/index.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
   }
 } 

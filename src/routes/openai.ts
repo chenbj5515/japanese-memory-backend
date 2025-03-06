@@ -116,11 +116,43 @@ openai.post('/completion', async (c) => {
       return c.json({ success: false, error: '未配置 OpenAI API 密钥' }, 500);
     }
 
-    const prompt = c.req.query('prompt');
-    const model = c.req.query('model') || 'gpt-4o';
+    console.log('getting body===');
+    console.log('Content-Type:', c.req.header('Content-Type'));
     
+    // 尝试获取请求体，添加超时处理
+    let body;
+    try {
+      // 创建一个带超时的 Promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('请求体解析超时')), 5000); // 5秒超时
+      });
+      
+      // 使用 text() 方法获取原始请求体，然后手动解析
+      const bodyTextPromise = c.req.text();
+      
+      // 使用 Promise.race 竞争，谁先完成就用谁的结果
+      const bodyText = await Promise.race([bodyTextPromise, timeoutPromise]) as string;
+      console.log('原始请求体:', bodyText);
+      
+      if (!bodyText || bodyText.trim() === '') {
+        return c.json({ success: false, error: '请求体为空' }, 400);
+      }
+      
+      body = JSON.parse(bodyText);
+    } catch (parseError) {
+      console.error('解析请求体失败:', parseError);
+      return c.json({ 
+        success: false, 
+        error: '无法解析请求体: ' + (parseError instanceof Error ? parseError.message : String(parseError)) 
+      }, 400);
+    }
+    
+    console.log('body getted===', body);
+
+    const { prompt, model = 'gpt-4o' } = body;
+
     if (!prompt) {
-      return c.json({ success: false, error: '缺少必要参数 prompt' }, 400);
+      return c.json({ success: false, error: '缺少必要的 prompt 参数' }, 400);
     }
 
     // 使用 ai-sdk 的 openaiClient 替代直接 fetch
@@ -135,7 +167,12 @@ openai.post('/completion', async (c) => {
       data: result.text
     });
   } catch (err: any) {
-    return c.json({ success: false, error: err?.message || '处理请求时发生错误' }, 500);
+    console.error('处理请求时发生错误:', err);
+    return c.json({ 
+      success: false, 
+      error: err?.message || '处理请求时发生错误',
+      stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined
+    }, 500);
   }
 });
 

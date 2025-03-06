@@ -118,34 +118,22 @@ openai.post('/completion', async (c) => {
 
     console.log('getting body===');
     console.log('Content-Type:', c.req.header('Content-Type'));
-    console.log('req:', c.req);
     
     // 尝试获取请求体，添加超时处理
     let body;
     try {
-      // 创建一个带超时的 Promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('请求体解析超时')), 5000); // 5秒超时
-      });
-      
-      // 使用 text() 方法获取原始请求体，然后手动解析
-      const bodyTextPromise = c.req.text();
-      
-      // 使用 Promise.race 竞争，谁先完成就用谁的结果
-      const bodyText = await Promise.race([bodyTextPromise, timeoutPromise]) as string;
-      console.log('原始请求体:', bodyText);
-      
-      if (!bodyText || bodyText.trim() === '') {
-        return c.json({ success: false, error: '请求体为空' }, 400);
+      // 尝试这种方式解析请求体
+      const contentType = c.req.header('Content-Type') || '';
+      if (contentType.includes('application/json')) {
+        body = await c.req.json();
+      } else {
+        const text = await c.req.text();
+        console.log('请求体文本:', text.substring(0, 200)); // 只打印前200个字符
+        body = JSON.parse(text);
       }
-      
-      body = JSON.parse(bodyText);
-    } catch (parseError) {
-      console.error('解析请求体失败:', parseError);
-      return c.json({ 
-        success: false, 
-        error: '无法解析请求体: ' + (parseError instanceof Error ? parseError.message : String(parseError)) 
-      }, 400);
+    } catch (e: any) {
+      console.log('解析请求体错误:', e?.message);
+      return c.json({ success: false, error: '无法解析请求体' }, 400);
     }
     
     console.log('body getted===', body);

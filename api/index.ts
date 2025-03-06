@@ -1,4 +1,5 @@
 import app from '../src/index';
+import { handle } from '@hono/node-server/vercel';
 
-// 导出处理函数，用于Vercel的API路由
-export default app.fetch; 
+// 使用Hono官方的Vercel适配器
+export default handle(app); 

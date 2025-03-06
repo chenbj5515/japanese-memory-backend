@@ -1,10 +1,10 @@
 import { serve } from '@hono/node-server';
 import app from './index';
-import dotenv from 'dotenv';
-import path from 'path';
+// import dotenv from 'dotenv';
+// import path from 'path';
 
 // 加载环境变量
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // 设置全局环境变量
 globalThis.GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';

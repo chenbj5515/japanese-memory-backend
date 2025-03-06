@@ -19,10 +19,16 @@ globalThis.OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // 获取端口，默认为3000
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
-console.log(`🚀 服务器启动在 http://localhost:${PORT}`);
+// 在本地环境中启动服务器
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`🚀 服务器启动在 http://localhost:${PORT}`);
+  
+  // 启动服务器
+  serve({
+    fetch: app.fetch,
+    port: PORT
+  });
+}
 
-// 启动服务器
-serve({
-  fetch: app.fetch,
-  port: PORT
-}); 
+// 导出app的fetch函数，用于Vercel等无服务器环境
+export default app; 

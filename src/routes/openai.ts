@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { openaiAuthMiddleware } from '../middleware/openai-auth';
 import { openai as openaiClient } from '@ai-sdk/openai';
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 
 const openai = new Hono();
 
@@ -123,28 +123,16 @@ openai.post('/completion', async (c) => {
       return c.json({ success: false, error: '缺少必要的 prompt 参数' }, 400);
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
-      })
+    // 使用 ai-sdk 的 openaiClient 替代直接 fetch
+    const result = await generateText({
+      model: openaiClient(model),
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      return c.json({ success: false, error: `OpenAI API 错误: ${error.error?.message || '未知错误'}` }, response.status as any);
-    }
-
-    const data = await response.json();
     return c.json({
       success: true,
-      data: data.choices[0]?.message?.content || ''
+      data: result.text
     });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || '处理请求时发生错误' }, 500);

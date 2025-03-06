@@ -116,7 +116,10 @@ openai.post('/completion', async (c) => {
       return c.json({ success: false, error: '未配置 OpenAI API 密钥' }, 500);
     }
 
+    console.log('getting body===');
     const body = await c.req.json();
+    console.log('body getted===', body);
+
     const { prompt, model = 'gpt-4o' } = body;
 
     if (!prompt) {

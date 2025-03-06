@@ -28,7 +28,7 @@ user.get('/info', async (c) => {
 });
 
 // 登出路由
-user.get('/auth/logout', (c) => {
+user.get('/logout', (c) => {
     // 通过设置 maxAge 为 0 来清除 'session' cookie
     setCookie(c, 'session', '', {
         httpOnly: true,

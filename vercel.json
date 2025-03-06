@@ -11,8 +11,5 @@
       "src": "/(.*)",
       "dest": "/api/index.ts"
     }
-  ],
-  "env": {
-    "NODEJS_HELPERS": "0"
-  }
+  ]
 } 

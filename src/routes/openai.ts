@@ -116,14 +116,11 @@ openai.post('/completion', async (c) => {
       return c.json({ success: false, error: '未配置 OpenAI API 密钥' }, 500);
     }
 
-    console.log('getting body===');
-    const body = await c.req.json();
-    console.log('body getted===', body);
-
-    const { prompt, model = 'gpt-4o' } = body;
-
+    const prompt = c.req.query('prompt');
+    const model = c.req.query('model') || 'gpt-4o';
+    
     if (!prompt) {
-      return c.json({ success: false, error: '缺少必要的 prompt 参数' }, 400);
+      return c.json({ success: false, error: '缺少必要参数 prompt' }, 400);
     }
 
     // 使用 ai-sdk 的 openaiClient 替代直接 fetch

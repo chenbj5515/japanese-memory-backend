@@ -118,6 +118,7 @@ openai.post('/completion', async (c) => {
 
     console.log('getting body===');
     console.log('Content-Type:', c.req.header('Content-Type'));
+    console.log('req:', c.req);
     
     // 尝试获取请求体，添加超时处理
     let body;

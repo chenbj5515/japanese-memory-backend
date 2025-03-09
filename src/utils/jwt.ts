@@ -1,7 +1,15 @@
 import jwt from 'jsonwebtoken';
 
+interface JWTPayload {
+    user_id: string | null;
+    current_plan: boolean;
+    profile?: string;
+    name?: string;
+    email?: string;
+}
+
 // 创建JWT令牌
-export function createJWTToken(payload: { user_id: number | null; current_plan: any }, secret: string = JWT_SECRET): string {
+export function createJWTToken(payload: JWTPayload, secret: string = JWT_SECRET): string {
     return jwt.sign(
         {
             ...payload,
@@ -12,6 +20,6 @@ export function createJWTToken(payload: { user_id: number | null; current_plan: 
 }
 
 // 验证JWT令牌
-export function verifyJWTToken(token: string, secret: string = JWT_SECRET): any {
-    return jwt.verify(token, secret);
+export function verifyJWTToken(token: string, secret: string = JWT_SECRET): JWTPayload & { exp: number } {
+    return jwt.verify(token, secret) as JWTPayload & { exp: number };
 }

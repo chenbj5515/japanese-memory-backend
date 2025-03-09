@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+model memo_card {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  translation        String
+  create_time        DateTime    @db.Timestamptz(6)
+  update_time        DateTime    @updatedAt @db.Timestamptz(6)
+  record_file_path   String?
+  original_text      String?
+  review_times       Int?        @default(0)
+  user_id            String      @default("chenbj")
+  kana_pronunciation String?
+  source_video_url   String?
+  word_card          word_card[] @relation("MemoToWord")
+}
+
+model user {
+  user_id     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String    @db.VarChar(255)
+  name        String?   @db.VarChar(255)
+  image       String?   @db.VarChar(255)
+  create_time DateTime? @default(now()) @db.Timestamptz(6)
+  update_time DateTime? @default(now()) @db.Timestamptz(6)
+  github_id   String?   @db.VarChar(255)
+  profile     String?   @db.VarChar(100)
+  subscriptions user_subscription[]
+}
+
+model word_card {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  word         String
+  meaning      String
+  create_time  DateTime  @db.Timestamptz(6)
+  user_id      String
+  review_times Int       @default(0)
+  memo_card_id String    @db.Uuid
+  memo_card    memo_card @relation("MemoToWord", fields: [memo_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_memo_card")
+}
+
+model exam_results {
+  result_id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  exam_id          String             @db.Uuid
+  question         String
+  question_type    question_type_enum
+  question_ref     String             @db.Uuid
+  user_answer      String
+  reference_answer String             @default("")
+  is_correct       Boolean            @default(false)
+  question_score   Int                @default(0)
+  create_time      DateTime           @default(now()) @db.Timestamp(6)
+}
+
+model exams {
+  exam_id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String           @db.Uuid
+  exam_name        String           @db.VarChar(255)
+  total_score      Int              @default(0)
+  status           exam_status_enum @default(initial)
+  duration_seconds Int?
+  create_time      DateTime         @default(now()) @db.Timestamp(6)
+}
+
+model articles {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content     String
+  create_time DateTime @db.Timestamptz(6)
+  user_id     String?
+  tags        String?
+  title       String?
+}
+
+model user_action_logs {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String              @db.Uuid
+  action_type  action_type_enum
+  related_id   String              @db.Uuid
+  related_type related_type_enum
+  create_time  DateTime            @default(now()) @db.Timestamptz(6)
+}
+
+enum action_type_enum {
+  COMPLETE_SENTENCE_REVIEW
+  COMPLETE_WORD_REVIEW
+  COMPLETE_EXAM
+  FORGOT_WORD_MEANING
+  FORGOT_WORD_PRONUNCIATION
+  UNKNOWN_PHRASE_EXPRESSION
+  UNABLE_TO_UNDERSTAND_AUDIO
+}
+
+enum related_type_enum {
+  word_card
+  memo_card
+  exam
+}
+
+enum question_type_enum {
+  kana_from_japanese
+  translation_from_japanese
+  japanese_from_chinese
+  transcription_from_audio
+}
+
+enum exam_status_enum {
+  initial
+  in_progress
+  completed
+}
+
+/// 会員プランの種類を示す列挙型
+enum membership_plan_enum {
+  MONTHLY     // 月額プラン
+}
+
+/// 会員サブスクリプションモデル：ユーザーが特定の会員プランに加入した詳細情報を記録
+model user_subscription {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id             String              @db.Uuid
+  start_time          DateTime            @default(now()) @db.Timestamptz(6) // サブスクリプションの開始日時
+  end_time            DateTime            @db.Timestamptz(6) // サブスクリプションの終了日時
+  active              Boolean             @default(true)  // サブスクリプションが有効かどうか
+  openai_api_key      String?             // SELF_API の場合、ユーザー自身の OPENAI API KEY を保持
+
+  user                user                @relation(fields: [user_id], references: [user_id])
+}

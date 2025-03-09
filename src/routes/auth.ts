@@ -5,9 +5,10 @@ import { generateToken } from '../utils/token';
 import { fetchGithubToken } from '../oauth2/github';
 import { fetchGoogleToken } from '../oauth2/google';
 import { generateJWTForUser } from '../services/auth';
-import { createDB } from '../db';
+import { PrismaClient } from '@prisma/client';
 
 const auth = new Hono();
+const prisma = new PrismaClient();
 
 // CSRF令牌路由
 auth.get('/csrf-token', (c) => {
@@ -81,11 +82,8 @@ auth.get('/github/callback', async (c) => {
         // 使用 fetchGithubToken 获取 token 和用户信息
         const { githubUser, access_token } = await fetchGithubToken(code, redirectUri);
 
-        // 创建数据库实例
-        const db = createDB();
-
         // 根据 GitHub 用户ID生成 JWT
-        const jwtToken = await generateJWTForUser(githubUser, githubUser.id, db);
+        const jwtToken = await generateJWTForUser(githubUser, githubUser.id, prisma);
 
         // 设置 cookie
         setCookie(c, 'session', jwtToken, {
@@ -167,9 +165,6 @@ auth.get('/google/callback', async (c) => {
         });
         const googleUser = await userRes.json();
         
-        // 创建数据库实例
-        const db = createDB();
-
         // 根据 Google 用户ID生成 JWT
         const jwtToken = await generateJWTForUser(
             {
@@ -179,7 +174,7 @@ auth.get('/google/callback', async (c) => {
                 image: googleUser.picture
             }, 
             googleUser.sub, 
-            db
+            prisma
         );
 
         // 设置 Cookie

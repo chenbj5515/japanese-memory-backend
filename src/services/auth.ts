@@ -1,5 +1,4 @@
-import { Kysely } from 'kysely';
-import { Database } from '../db/schema';
+import { PrismaClient } from '@prisma/client';
 import { createJWTToken } from '../utils/jwt';
 import { getRandomNumber } from '../utils/token';
 
@@ -11,18 +10,24 @@ interface PlatformUser {
 }
 
 // 为用户生成JWT
-export async function generateJWTForUser(platformUser: PlatformUser, platformId: string, db: Kysely<Database>, secret: string = JWT_SECRET): Promise<string> {
+export async function generateJWTForUser(platformUser: PlatformUser, platformId: string, prisma: PrismaClient, secret: string = JWT_SECRET): Promise<string> {
     // 查询用户是否已存在
-    const existing = await db
-        .selectFrom('user')
-        .select(['user_id', 'profile', 'name', 'email'])
-        .where('github_id', '=', platformId)
-        .executeTakeFirst();
+    const existing = await prisma.user.findFirst({
+        where: {
+            github_id: platformId
+        },
+        select: {
+            user_id: true,
+            profile: true,
+            name: true,
+            email: true
+        }
+    });
 
     // 明确指定 tokenPayload 类型
-    let tokenPayload: { user_id: number | null; current_plan: any; profile: string; name: string; email: string } = {
+    let tokenPayload: { user_id: string | null; current_plan: boolean; profile: string; name: string; email: string } = {
         user_id: null,
-        current_plan: null,
+        current_plan: false,
         profile: '',
         name: '',
         email: '',
@@ -30,26 +35,26 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
 
     if (existing) {
         tokenPayload.user_id = existing.user_id;
-        tokenPayload.profile = existing.profile;
-        tokenPayload.name = existing.name;
+        tokenPayload.profile = existing.profile || '';
+        tokenPayload.name = existing.name || '';
         tokenPayload.email = existing.email;
-        // 从 user_current_plan 表中查询对应的 current_plan 值
-        const planRow = await db
-            .selectFrom('user_current_plan')
-            .select(['current_plan'])
-            .where('user_id', '=', existing.user_id)
-            .executeTakeFirst();
 
-        if (planRow) {
-            tokenPayload.current_plan = planRow.current_plan;
-        }
-    }
-    else {
+        // 检查用户是否有有效的订阅
+        const subscription = await prisma.user_subscription.findFirst({
+            where: {
+                user_id: existing.user_id,
+                active: true,
+                end_time: {
+                    gt: new Date() // 确保订阅未过期
+                }
+            }
+        });
+
+        tokenPayload.current_plan = !!subscription;
+    } else {
         // 如果用户不存在，创建新用户
-        const newUser = await db
-            .insertInto('user')
-            // @ts-ignore
-            .values({
+        const newUser = await prisma.user.create({
+            data: {
                 github_id: platformId,
                 email: platformUser.email,
                 name: platformUser.name,
@@ -57,16 +62,20 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
                 profile: `/assets/profiles/0${getRandomNumber()}.png`,
                 create_time: new Date(),
                 update_time: new Date()
-            })
-            .returning(['user_id', 'profile', 'name', 'email'])
-            .executeTakeFirst();
+            },
+            select: {
+                user_id: true,
+                profile: true,
+                name: true,
+                email: true
+            }
+        });
 
-        if (newUser) {
-            tokenPayload.user_id = newUser.user_id;
-            tokenPayload.profile = newUser.profile;
-            tokenPayload.name = newUser.name;
-            tokenPayload.email = newUser.email;
-        }
+        tokenPayload.user_id = newUser.user_id;
+        tokenPayload.profile = newUser.profile || '';
+        tokenPayload.name = newUser.name || '';
+        tokenPayload.email = newUser.email;
+        tokenPayload.current_plan = false; // 新用户默认没有订阅
     }
 
     // 返回生成的 JWT token

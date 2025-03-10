@@ -14,11 +14,11 @@ user.get('/info', async (c) => {
     try {
         // 解析为完整对象
         const decoded = verifyJWTToken(token) as {
-            user_id: number;
+            user_id: string;
             name: string;
             email: string;
             profile: string;
-            current_plan: any;
+            current_plan: boolean;
             exp: number;
         };
         return c.json({ success: true, user: decoded });

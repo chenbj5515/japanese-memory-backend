@@ -36,17 +36,26 @@ stripe.post('/webhook', async (c) => {
         // 处理发票支付成功事件
         if (event.type === 'invoice.payment_succeeded') {
             const invoice = event.data.object as Stripe.Invoice;
-            const customerId = invoice.customer as string;
             
-            // 获取客户信息
-            const customer = await stripeClient.customers.retrieve(customerId) as Stripe.Customer;
-            const userId = customer.metadata?.user_id;
+            console.log('invoice=============', invoice);
+            // 获取关联的 checkout session
+            const session = await stripeClient.checkout.sessions.list({
+                payment_intent: invoice.payment_intent as string,
+                limit: 1,
+            });
 
-            console.log('metadata=============', customer.metadata);
+            if (!session.data.length) {
+                throw new Error('未找到关联的 Checkout Session');
+            }
+
+            console.log('session data=============', session.data[0]);
+            const userId = session.data[0].client_reference_id;
 
             if (!userId) {
                 throw new Error('未找到用户ID');
             }
+
+            // console.log('userId from checkout session=============', userId);
 
             // 计算订阅时间
             const startTime = new Date();

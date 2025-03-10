@@ -31,6 +31,8 @@ stripe.post('/webhook', async (c) => {
             STRIPE_WEBHOOK_SECRET
         );
 
+        console.log('event=============', event.type);
+
         // 处理支付成功事件
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object as Stripe.Checkout.Session;

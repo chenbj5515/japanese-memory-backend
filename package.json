@@ -26,7 +26,7 @@
   "scripts": {
     "dev": "nodemon --watch src --exec ts-node --transpile-only src/server.ts",
     "build": "tsc",
-    "postinstall": "prisma generate",
+    "postinstall": "npx prisma generate",
     "vercel-build": "tsc",
     "start": "node dist/server.js",
     "deploy": "wrangler deploy"

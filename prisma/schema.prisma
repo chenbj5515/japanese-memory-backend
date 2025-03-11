@@ -15,9 +15,10 @@ model memo_card {
   record_file_path   String?
   original_text      String?
   review_times       Int?        @default(0)
+  forget_count       Int         @default(0)
   user_id            String      @default("chenbj")
   kana_pronunciation String?
-  source_video_url   String?
+  context_url   String?
   word_card          word_card[] @relation("MemoToWord")
 }
 
@@ -40,6 +41,7 @@ model word_card {
   create_time  DateTime  @db.Timestamptz(6)
   user_id      String
   review_times Int       @default(0)
+  forget_count Int       @default(0)
   memo_card_id String    @db.Uuid
   memo_card    memo_card @relation("MemoToWord", fields: [memo_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_memo_card")
 }

@@ -17,9 +17,9 @@ declare module 'hono' {
     'user': {
       user_id: string;
       has_subscription: boolean;
-      profile?: string;
-      name?: string;
-      email?: string;
+      profile: string;
+      name: string;
+      email: string;
     }
   }
 } 

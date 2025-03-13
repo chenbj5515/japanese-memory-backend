@@ -9,6 +9,14 @@ interface PlatformUser {
     image?: string;
 }
 
+interface JWTPayload {
+    user_id: string;
+    has_subscription: boolean;
+    profile: string;
+    name: string;
+    email: string;
+}
+
 // 为用户生成JWT
 export async function generateJWTForUser(platformUser: PlatformUser, platformId: string, prisma: PrismaClient, secret: string = JWT_SECRET): Promise<string> {
     // 查询用户是否已存在
@@ -25,9 +33,9 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
     });
 
     // 明确指定 tokenPayload 类型
-    let tokenPayload: { user_id: string | null; current_plan: boolean; profile: string; name: string; email: string } = {
-        user_id: null,
-        current_plan: false,
+    let tokenPayload: JWTPayload = {
+        user_id: '',
+        has_subscription: false,
         profile: '',
         name: '',
         email: '',
@@ -50,7 +58,7 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
             }
         });
 
-        tokenPayload.current_plan = !!subscription;
+        tokenPayload.has_subscription = !!subscription;
     } else {
         // 如果用户不存在，创建新用户
         const newUser = await prisma.user.create({
@@ -75,7 +83,7 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
         tokenPayload.profile = newUser.profile || '';
         tokenPayload.name = newUser.name || '';
         tokenPayload.email = newUser.email;
-        tokenPayload.current_plan = false; // 新用户默认没有订阅
+        tokenPayload.has_subscription = false; // 新用户默认没有订阅
     }
 
     // 返回生成的 JWT token

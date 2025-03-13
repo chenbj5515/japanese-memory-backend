@@ -18,7 +18,7 @@ user.get('/info', async (c) => {
             name: string;
             email: string;
             profile: string;
-            current_plan: boolean;
+            has_subscription: boolean;
             exp: number;
         };
         return c.json({ success: true, user: decoded });

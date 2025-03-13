@@ -1,11 +1,11 @@
 import jwt from 'jsonwebtoken';
 
 interface JWTPayload {
-    user_id: string | null;
-    current_plan: boolean;
-    profile?: string;
-    name?: string;
-    email?: string;
+    user_id: string;
+    has_subscription: boolean;
+    profile: string;
+    name: string;
+    email: string;
 }
 
 // 创建JWT令牌

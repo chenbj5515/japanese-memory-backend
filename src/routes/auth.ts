@@ -5,10 +5,10 @@ import { generateToken } from '../utils/token';
 import { fetchGithubToken } from '../oauth2/github';
 import { fetchGoogleToken } from '../oauth2/google';
 import { generateJWTForUser } from '../services/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../services/prisma';
+// import { PrismaClient } from '@prisma/client';
 
 const auth = new Hono();
-const prisma = new PrismaClient();
 
 // CSRF令牌路由
 auth.get('/csrf-token', (c) => {

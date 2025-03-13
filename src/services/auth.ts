@@ -14,7 +14,7 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
     // 查询用户是否已存在
     const existing = await prisma.user.findFirst({
         where: {
-            github_id: platformId
+            github_id: platformId.toString()
         },
         select: {
             user_id: true,

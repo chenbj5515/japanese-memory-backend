@@ -1,6 +1,7 @@
+import { JWTPayload } from 'hono/utils/jwt/types';
 import jwt from 'jsonwebtoken';
 
-interface JWTPayload {
+export interface User {
     user_id: string;
     has_subscription: boolean;
     profile: string;
@@ -9,7 +10,7 @@ interface JWTPayload {
 }
 
 // 创建JWT令牌
-export function createJWTToken(payload: JWTPayload, secret: string = JWT_SECRET): string {
+export function createJWTToken(payload: User, secret: string = JWT_SECRET): string {
     return jwt.sign(
         {
             ...payload,
@@ -20,6 +21,6 @@ export function createJWTToken(payload: JWTPayload, secret: string = JWT_SECRET)
 }
 
 // 验证JWT令牌
-export function verifyJWTToken(token: string, secret: string = JWT_SECRET): JWTPayload & { exp: number } {
-    return jwt.verify(token, secret) as JWTPayload & { exp: number };
+export function verifyJWTToken(token: string, secret: string = JWT_SECRET): User & { exp: number } {
+    return jwt.verify(token, secret) as User & { exp: number };
 }

@@ -98,6 +98,7 @@ enum action_type_enum {
   CREATE_MEMO
   CREATE_WORD
   COMPLETE_IMAGE_OCR
+  COMPLETE_TEXT_TRANSLATION_BY_EXTENSION
 }
 
 enum related_type_enum {

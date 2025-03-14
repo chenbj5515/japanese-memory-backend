@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { createJWTToken } from '../utils/jwt';
+import { createJWTToken, User } from '../utils/jwt';
 import { getRandomNumber } from '../utils/token';
 
 interface PlatformUser {
@@ -33,7 +33,7 @@ export async function generateJWTForUser(platformUser: PlatformUser, platformId:
     });
 
     // 明确指定 tokenPayload 类型
-    let tokenPayload: JWTPayload = {
+    let tokenPayload: User = {
         user_id: '',
         has_subscription: false,
         profile: '',

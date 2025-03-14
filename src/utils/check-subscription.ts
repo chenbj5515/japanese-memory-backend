@@ -15,6 +15,7 @@ export async function checkSubscription(userId: string): Promise<boolean> {
     }
 
     const currentTime = new Date();
+    console.log(userSubscription.end_time, currentTime);
     const isValid = userSubscription.end_time > currentTime;
 
     return isValid;

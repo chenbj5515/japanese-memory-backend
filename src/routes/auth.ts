@@ -100,6 +100,8 @@ auth.get('/github/callback', async (c) => {
             sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 // 7天
         });
+
+        console.log('种cookie', jwtToken);
         
         // 重定向到前端URL
         return c.redirect(NEXT_PUBLIC_BASE_URL);

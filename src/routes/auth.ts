@@ -8,6 +8,14 @@ import { generateJWTForUser } from '../services/auth';
 import { prisma } from '../services/prisma';
 // import { PrismaClient } from '@prisma/client';
 
+// 环境变量
+// const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
+// const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+// const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+// const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+// const BASE_URL = process.env.BASE_URL || '';
+const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || '';
+
 const auth = new Hono();
 
 // CSRF令牌路由
@@ -92,7 +100,9 @@ auth.get('/github/callback', async (c) => {
             sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 // 7天
         });
-        return c.text('success');
+        
+        // 重定向到前端URL
+        return c.redirect(NEXT_PUBLIC_BASE_URL);
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 400);
     }
@@ -184,7 +194,9 @@ auth.get('/google/callback', async (c) => {
             sameSite: 'None',
             maxAge: 7 * 24 * 60 * 60 // 7天
         });
-        return c.text('success');
+        
+        // 重定向到前端URL
+        return c.redirect(NEXT_PUBLIC_BASE_URL);
     } catch (err: any) {
         return c.json({ success: false, error: err.message }, 400);
     }
